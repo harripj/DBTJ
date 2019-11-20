@@ -1,7 +1,7 @@
 # DBTJ
 A Jupyter Notebook for visualising Double Barrier Tunneling Junction behaviour of Scanning Tunneling Spectroscopy (STS) data from a Scanning Tunneling Microscope (STM).
 
-![Example use](example.png)
+![example use](example.png)
 
 Model is based on the paper:
 
