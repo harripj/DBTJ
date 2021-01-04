@@ -1,12 +1,12 @@
-
 import numpy as _np
 import numba as _nb
 from scipy.constants import electron_volt as _e, Boltzmann as _kB
 
+
 @_nb.njit
 def gamma(dE, R, T=4.2, val=1e-1):
     # type: (numpy.ndarray, float, float, float) -> numpy.ndarray
-    '''
+    """
 
     Fermi's golden rule tunneling rate.
 
@@ -21,31 +21,32 @@ def gamma(dE, R, T=4.2, val=1e-1):
     val: float, default is 1e-1
         Value to replace unrealistic tunneling rates with to avoid ZeroDivisionError.
         Keep small.
-    
+
     Returns
     -------
     gamma: numpy.ndarray
         Tunneling rates.
-    
-    '''
+
+    """
     # format input
     dE = _np.asarray(dE, dtype=_np.float_)
     # calculate model
-    out = (1./(R*_e**2.)) * -dE/(1.-_np.exp(dE/(_kB*T)))
+    out = (1.0 / (R * _e ** 2.0)) * -dE / (1.0 - _np.exp(dE / (_kB * T)))
     # substitute in val is dE>0 -> gamma would be small or zero
     # avoids ZeroDivisionError
-    out[dE>0.] = val
+    out[dE > 0.0] = val
     return out
+
 
 @_nb.njit
 def dbtj(bias, R1, R2, C1, C2, Q0, T=4.2, nmax=20, val=1e-1):
     # type: (numpy.ndarray, float, float, float, float, float, float, int, float) -> numpy.ndarray
-    '''
-    
+    """
+
     Double Barrier Tunneling Junction Model.
 
     [1] Hanna, Tinkham (1991), Phys. Rev. B 44 (11), p. 5919-5922, DOI:10.1103/PhysRevB.44.5919
-    
+
     Parameters
     ----------
     bias: array-like
@@ -63,24 +64,24 @@ def dbtj(bias, R1, R2, C1, C2, Q0, T=4.2, nmax=20, val=1e-1):
     val: float, default is 1e-1
         Value to replace unrealistic tunneling rates with to avoid ZeroDivisionError.
         Keep small.
-    
+
     Returns
     -------
     I: numpy.ndarray
         Calculated tunneling current.
-    
-    '''
+
+    """
     # format input
     bias = _np.asarray(bias, dtype=_np.float_)
     # check valid Q0
-    assert (-1./2)<=Q0<(1./2), 'Q0 must be in range (-0.5<=Q0<0.5).'
-    
+    assert (-1.0 / 2) <= Q0 < (1.0 / 2), "Q0 must be in range (-0.5<=Q0<0.5)."
+
     # total capacitance
     Csum = C1 + C2
-    
+
     # number of electrons on center electrode to consider
-    n = _np.arange(-nmax, nmax+1)
-    
+    n = _np.arange(-nmax, nmax + 1)
+
     # current array holders
     I1 = _np.zeros_like(bias, dtype=_np.float_)
     # uncomment below to return both I1 and I2
@@ -89,11 +90,11 @@ def dbtj(bias, R1, R2, C1, C2, Q0, T=4.2, nmax=20, val=1e-1):
     # for each bias
     for i, V in enumerate(bias):
         # calculate ±(dE1, dE2) according to equations
-        dE1_plus = _e/Csum * (_e/2. + _e*(n-Q0) + C2*V)
-        dE1_minus = _e/Csum * (_e/2. - _e*(n-Q0) - C2*V)
+        dE1_plus = _e / Csum * (_e / 2.0 + _e * (n - Q0) + C2 * V)
+        dE1_minus = _e / Csum * (_e / 2.0 - _e * (n - Q0) - C2 * V)
 
-        dE2_plus = _e/Csum * (_e/2. + _e*(n-Q0) - C1*V)
-        dE2_minus = _e/Csum * (_e/2. - _e*(n-Q0) + C1*V)
+        dE2_plus = _e / Csum * (_e / 2.0 + _e * (n - Q0) - C1 * V)
+        dE2_minus = _e / Csum * (_e / 2.0 - _e * (n - Q0) + C1 * V)
 
         # calculate tunnelling rate accoring to Fermi's golden rule approx.
         gamma1_plus = gamma(dE1_plus, R1, T, val)
@@ -103,24 +104,27 @@ def dbtj(bias, R1, R2, C1, C2, Q0, T=4.2, nmax=20, val=1e-1):
         gamma2_minus = gamma(dE2_minus, R2, T, val)
 
         # make sure that gamma is nonzero
-        gamma1_plus[dE1_plus>0.] = val
-        gamma1_minus[dE1_minus>0.] = val
-        gamma2_plus[dE2_plus>0.] = val
-        gamma2_minus[dE2_minus>0.] = val
+        gamma1_plus[dE1_plus > 0.0] = val
+        gamma1_minus[dE1_minus > 0.0] = val
+        gamma2_plus[dE2_plus > 0.0] = val
+        gamma2_minus[dE2_minus > 0.0] = val
 
         # calculate sigma and normalise -> sigma(n)/sigma(n+1)
         sigma = _np.ones_like(n, dtype=_np.float_)
         # sigma(n+1) is dependent on sigma(n)
         for j in range(sigma[1:].size):
-            sigma[j+1] = sigma[j] * (gamma1_plus[j] + gamma2_plus[j])\
-                                  / (gamma1_minus[j+1] + gamma2_minus[j+1])
+            sigma[j + 1] = (
+                sigma[j]
+                * (gamma1_plus[j] + gamma2_plus[j])
+                / (gamma1_minus[j + 1] + gamma2_minus[j + 1])
+            )
         # normalise sigma
         sigma /= sigma.sum()
-        
+
         # calculate DBTJ current
-        I1[i] = _e * _np.sum(sigma * (gamma1_minus-gamma1_plus))
+        I1[i] = _e * _np.sum(sigma * (gamma1_minus - gamma1_plus))
         # I2[i] = _e * _np.sum(sigma * (gamma2_plus-gamma2_minus))
-    
+
     out = I1
     # uncomment below to return both I1 and I2
     # out = (I1, I2)
